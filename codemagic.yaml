@@ -1,0 +1,83 @@
+# Codemagic 云构建配置：在 macOS 构建机上编译 Folia iPad IPA。
+#
+# 首次使用前，在 Codemagic 网页端完成两步配置：
+# 1. 连接本仓库（GitHub/GitLab/Bitbucket 均可），Codemagic 检测到本文件后会出现
+#    「Folia iPad (IPA)」工作流。
+# 2. 在 Workflow variables（或 Team variables）中上传/创建三个安全变量（勾选 Secure）：
+#      CM_CERTIFICATE          类型 Code signing certificate，内容为你的 .p12 文件
+#      CM_CERTIFICATE_PASSWORD .p12 的密码（普通安全变量）
+#      CM_PROVISIONING_PROFILE 类型 Provisioning profile，内容为 .mobileprovision
+#    描述文件的 Bundle ID 必须能匹配 top.izuna.foliamajor（或使用通配描述文件）。
+#    要装到自己的 iPad，请用 development / ad-hoc 描述文件并提前在 Apple 后台登记设备 UDID；
+#    App Store 类型的包只能经 TestFlight/商店安装。
+#
+# 前端若有改动，推送到仓库即可，本流程会重新执行 vite build，无需手工同步 dist。
+
+workflows:
+  folia-ipa:
+    name: Folia iOS (iPhone/iPad IPA)
+    instance_type: mac_mini_m2
+    max_build_duration: 60
+    environment:
+      xcode: latest
+      node: 24
+      vars:
+        XCODE_PROJECT: ios/App/App.xcodeproj
+        XCODE_SCHEME: App
+      signing:
+        certificate: $CM_CERTIFICATE
+        certificate_password: $CM_CERTIFICATE_PASSWORD
+        provisioning_profiles:
+          - $CM_PROVISIONING_PROFILE
+    cache:
+      cache_paths:
+        - node_modules
+        - $HOME/.npm
+        - $HOME/Library/Developer/Xcode/DerivedData/**/SourcePackages
+    triggering:
+      events:
+        - push
+        - tag
+      branch_patterns:
+        - pattern: "*"
+          include: true
+    scripts:
+      - name: 安装 Web 依赖（跳过 Electron/Playwright 二进制，Web 构建用不到）
+        script: |
+          export ELECTRON_SKIP_BINARY_DOWNLOAD=1
+          export PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1
+          npm ci --no-audit --no-fund
+      - name: 构建 Vite Web 产物（dist）
+        script: npx vite build
+      - name: 同步 Web 产物到 iOS 原生工程
+        script: npx cap copy ios
+      - name: 归档并签名导出 IPA（分发类型自动跟随描述文件）
+        script: |
+          xcode-project build-ipa \
+            --project "$XCODE_PROJECT" \
+            --scheme "$XCODE_SCHEME"
+    artifacts:
+      - build/ios/ipa/*.ipa
+      - $HOME/Library/Developer/Xcode/DerivedData/**/Logs/**/*.log
+    publishing:
+      # 构建完成后发送下载链接；把地址配置到 Codemagic 变量 DEVELOPER_EMAIL 后自动生效，
+      # 也可以不配置，直接在构建页 Artifacts 里下载 IPA。
+      email:
+        recipients:
+          - $DEVELOPER_EMAIL
+
+# ---------------------------------------------------------------------------
+# 备选：自动签名（不想用 .p12/描述文件时）
+# 1. 在 Codemagic 的 Integrations 中连接 Apple Developer Portal；
+# 2. 删除上方 environment.signing 整段，换成下面这段（取消注释），归档步骤不变：
+#
+#    environment:
+#      xcode: latest
+#      node: 24
+#      vars:
+#        XCODE_PROJECT: ios/App/App.xcodeproj
+#        XCODE_SCHEME: App
+#      ios-auto-signs:
+#        - app_identifier: top.izuna.foliamajor
+#          distribution_type: ad_hoc   # development / ad_hoc / app_store
+# ---------------------------------------------------------------------------
