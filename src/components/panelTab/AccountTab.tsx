@@ -1,6 +1,12 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { motion } from 'framer-motion';
-import { LogOut, SlidersHorizontal, HardDrive, Trash2, RefreshCw, Crown } from 'lucide-react';
+import { LogOut, SlidersHorizontal, HardDrive, Trash2, RefreshCw, Crown, Server } from 'lucide-react';
+import {
+    RUNTIME_API_BASE_PROVIDERS,
+    readRuntimeApiBase,
+    writeRuntimeApiBase,
+    type RuntimeApiBaseProviderId,
+} from '../../services/onlineMusic/runtimeApiBase';
 import { useTranslation } from 'react-i18next';
 import type { AudioQualityPreference, ProviderUser } from '../../types/onlineMusic';
 import type { LibraryAccountController } from '../../library/core/contracts/account';
@@ -34,6 +40,70 @@ const AUDIO_QUALITY_OPTIONS: Array<{
 ];
 
 const selectLogoutPending = (snapshot: LibraryAccountSnapshot) => snapshot.logout.status === 'pending';
+
+// 桌面端有内嵌后端，无需配置；网页与 iOS 封装版在此填写自建音乐 API 地址。
+const isWebRuntime = () =>
+    !(typeof window !== 'undefined' && typeof (window as any)?.electron?.getNeteasePort === 'function');
+
+const PROVIDER_LABEL_KEYS: Record<RuntimeApiBaseProviderId, string> = {
+    netease: 'account.neteaseBase',
+    qq: 'account.qqBase',
+    kugou: 'account.kugouBase',
+};
+
+const MusicServiceEndpointCard: React.FC = () => {
+    const { t } = useTranslation();
+    const [bases, setBases] = useState<Record<RuntimeApiBaseProviderId, string>>(() => ({
+        netease: readRuntimeApiBase('netease'),
+        qq: readRuntimeApiBase('qq'),
+        kugou: readRuntimeApiBase('kugou'),
+    }));
+
+    const handleSave = () => {
+        RUNTIME_API_BASE_PROVIDERS.forEach(providerId => writeRuntimeApiBase(providerId, bases[providerId]));
+        // 传输层对地址做了会话级缓存，整页重载是让三个平台同时生效的最稳妥方式。
+        window.location.reload();
+    };
+
+    return (
+        <div className="bg-white/5 p-3 rounded-xl">
+            <div className="flex items-center gap-2 mb-2 opacity-60">
+                <Server size={12} />
+                <span className="text-[10px] font-bold uppercase tracking-wide">
+                    {t('account.musicServiceTitle')}
+                </span>
+            </div>
+            <p className="text-[10px] opacity-50 leading-relaxed mb-2">
+                {t('account.musicServiceHint')}
+            </p>
+            <div className="flex flex-col gap-2">
+                {RUNTIME_API_BASE_PROVIDERS.map(providerId => (
+                    <label key={providerId} className="flex flex-col gap-1">
+                        <span className="text-[10px] opacity-60">{t(PROVIDER_LABEL_KEYS[providerId])}</span>
+                        <input
+                            type="url"
+                            inputMode="url"
+                            autoCapitalize="off"
+                            autoCorrect="off"
+                            spellCheck={false}
+                            placeholder="https://your-server.example.com"
+                            value={bases[providerId]}
+                            onChange={event => setBases(prev => ({ ...prev, [providerId]: event.target.value }))}
+                            className="w-full min-w-0 px-2 py-1.5 rounded-lg bg-black/30 border border-white/10 text-[11px] font-mono text-zinc-200 placeholder:text-zinc-600 outline-none focus:border-white/30"
+                        />
+                    </label>
+                ))}
+            </div>
+            <button
+                type="button"
+                onClick={handleSave}
+                className="mt-2 w-full py-1.5 bg-white/10 hover:bg-white/20 rounded-lg text-[10px] font-bold transition-colors"
+            >
+                {t('account.saveAndReload')}
+            </button>
+        </div>
+    );
+};
 
 const AccountTab: React.FC<AccountTabProps> = ({
     user,
@@ -137,6 +207,9 @@ const AccountTab: React.FC<AccountTabProps> = ({
                     ))}
                 </div>
             </div>
+
+            {/* 网页版 / iOS：登录前必须先配置自建音乐 API 服务地址，桌面端不显示。 */}
+            {isWebRuntime() && <MusicServiceEndpointCard />}
 
             {/* Cache Management Section */}
             {/* <div className="bg-white/5 p-3 rounded-xl mb-2">

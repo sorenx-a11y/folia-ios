@@ -1,5 +1,6 @@
 import { OnlineProviderError } from '../../types/onlineMusic';
 import { readProviderSessionValue, removeProviderSessionValue, writeProviderSessionValue } from './providerStorage';
+import { readRuntimeApiBase } from './runtimeApiBase';
 
 // src/services/onlineMusic/qqTransport.ts
 
@@ -44,6 +45,10 @@ const ENDPOINTS: Record<QqOperation, string> = {
 const QR_CONFIRMED_CODE = 803;
 
 const getWebApiBase = (): string => {
+    // 运行时覆盖（网页/iOS 在账户页保存的自建服务地址）优先于构建期环境变量。
+    const runtimeOverride = readRuntimeApiBase('qq');
+    if (runtimeOverride) return runtimeOverride;
+
     const viteValue = typeof import.meta !== 'undefined' && import.meta.env?.MODE !== 'test'
         ? String((import.meta as ImportMeta & { env?: Record<string, string> }).env?.VITE_QQ_API_BASE || '')
         : '';

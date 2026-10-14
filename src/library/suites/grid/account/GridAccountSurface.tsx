@@ -20,6 +20,10 @@ import { buildQrLoginFailureHelpProps } from './buildQrLoginFailureHelpProps';
 import ConfirmDialog from '../../../../components/shared/ConfirmDialog';
 import qqIcon from '../../../../assets/providers/qq.svg';
 import wechatIcon from '../../../../assets/providers/wechat.svg';
+import {
+    RUNTIME_API_BASE_PROVIDERS,
+    type RuntimeApiBaseProviderId,
+} from '../../../../services/onlineMusic/runtimeApiBase';
 
 // src/library/suites/grid/account/GridAccountSurface.tsx
 // 网格的 account surface（Library v2 · A5）：按账户 controller 的快照渲染登录弹窗（OnlineProviderLoginModal）与
@@ -46,6 +50,10 @@ type GridLoginFeatures = {
     diagnostics: boolean;
     backendRestart: boolean;
 };
+
+// 桌面端有内嵌音乐后端；网页 / iOS 封装版需要用户填写自建 API 地址。
+const isWebRuntime = () =>
+    typeof window !== 'undefined' && typeof (window as { electron?: { getNeteasePort?: unknown } })?.electron?.getNeteasePort !== 'function';
 
 /** 把已翻译的登录快照与 controller 动作装成登录弹窗的 props（与原 Grid3D 传的那一套同形）。 */
 const buildLoginModalProps = (
@@ -103,6 +111,15 @@ const buildLoginModalProps = (
                     return result.report;
                 },
             })
+            : undefined,
+        runtimeEndpoint: isWebRuntime()
+            && (RUNTIME_API_BASE_PROVIDERS as readonly string[]).includes(session.providerId)
+            ? {
+                providerId: session.providerId as RuntimeApiBaseProviderId,
+                title: t('account.endpointTitle'),
+                hint: t('account.endpointHint'),
+                saveLabel: t('account.endpointSave'),
+            }
             : undefined,
         onRetry: () => void account.retryLogin(),
         onClose: () => void account.closeLogin(),

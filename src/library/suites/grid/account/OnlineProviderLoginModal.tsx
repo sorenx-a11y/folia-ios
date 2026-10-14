@@ -1,6 +1,8 @@
+import { useState, type FC } from 'react';
 import { AlertTriangle, Check, Loader2, RotateCcw, ServerCog, X } from 'lucide-react';
 import { motion } from 'framer-motion';
 import QrLoginFailureHelp, { type QrLoginFailureHelpProps } from './QrLoginFailureHelp';
+import { readRuntimeApiBase, writeRuntimeApiBase, type RuntimeApiBaseProviderId } from '../../../../services/onlineMusic/runtimeApiBase';
 
 // src/library/suites/grid/account/OnlineProviderLoginModal.tsx
 // 扫码登录弹窗。平时是窄的单栏：二维码、状态行、重试 / 重启；登录失败后变成两栏，失败帮助（简单办法、自检、
@@ -44,8 +46,51 @@ type OnlineProviderLoginModalProps = {
     backendFailure?: BackendFailureProps;
     // 只在扫码登录失败时传入（含后端没拉起来），显示在二维码旁边。
     failureHelp?: QrLoginFailureHelpProps;
+    /** 网页/iOS 运行时传入：弹窗底部显示自建 API 地址配置，解决二维码无法加载的问题。 */
+    runtimeEndpoint?: {
+        providerId: RuntimeApiBaseProviderId;
+        title: string;
+        hint: string;
+        saveLabel: string;
+    };
     onRetry: () => void;
     onClose: () => void;
+};
+
+// 网页/iOS 版没有内嵌后端：在扫码弹窗里直接配置自建 API 地址，保存后整页刷新重新拉二维码。
+const RuntimeEndpointBox: FC<{ config: NonNullable<OnlineProviderLoginModalProps['runtimeEndpoint']> }> = ({ config }) => {
+    const [value, setValue] = useState(() => readRuntimeApiBase(config.providerId));
+    return (
+        <div className="mt-5 rounded-2xl border border-white/10 bg-white/5 p-3 text-left">
+            <p className="text-[10px] font-semibold uppercase tracking-[0.16em] opacity-45 mb-1.5" style={{ color: 'var(--text-secondary)' }}>
+                {config.title}
+            </p>
+            <p className="text-[10px] leading-snug opacity-55 mb-2" style={{ color: 'var(--text-secondary)' }}>
+                {config.hint}
+            </p>
+            <input
+                type="url"
+                inputMode="url"
+                autoCapitalize="off"
+                autoCorrect="off"
+                spellCheck={false}
+                placeholder="https://your-server.example.com"
+                value={value}
+                onChange={event => setValue(event.target.value)}
+                className="w-full min-w-0 px-2.5 py-2 rounded-lg bg-black/30 border border-white/10 text-[11px] font-mono text-zinc-200 placeholder:text-zinc-600 outline-none focus:border-white/30"
+            />
+            <button
+                type="button"
+                onClick={() => {
+                    writeRuntimeApiBase(config.providerId, value);
+                    window.location.reload();
+                }}
+                className="mt-2 w-full py-2 rounded-full bg-white/10 hover:bg-white/15 text-[11px] font-semibold transition-colors"
+            >
+                {config.saveLabel}
+            </button>
+        </div>
+    );
 };
 
 const OnlineProviderLoginModal = ({
@@ -60,6 +105,7 @@ const OnlineProviderLoginModal = ({
     loginMethods,
     backendFailure,
     failureHelp,
+    runtimeEndpoint,
     onRetry,
     onClose,
 }: OnlineProviderLoginModalProps) => {
@@ -193,6 +239,7 @@ const OnlineProviderLoginModal = ({
                         </div>
                     )}
                 </div>
+                {runtimeEndpoint && <RuntimeEndpointBox config={runtimeEndpoint} />}
                 <p className="text-[10px] opacity-30 mt-6" style={{ color: 'var(--text-secondary)' }}>{note}</p>
             </motion.div>
         </motion.div>

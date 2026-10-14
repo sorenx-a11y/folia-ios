@@ -1158,7 +1158,16 @@ export default {
     "qualityExhigh": "Very High",
     "qualityLossless": "Lossless",
     "qualityHires": "Hi-Res",
-    "vipOnly": "VIP Only"
+    "vipOnly": "VIP Only",
+    "musicServiceTitle": "Music Service Endpoints",
+    "musicServiceHint": "Enter the base URL of your self-hosted API server (no trailing slash). The app reloads after saving. Leave empty to use the build-time default.",
+    "neteaseBase": "NetEase API",
+    "qqBase": "QQ Music API",
+    "kugouBase": "KuGou API",
+    "saveAndReload": "Save & Reload",
+    "endpointTitle": "API Endpoint",
+    "endpointHint": "The iPhone/web build has no built-in music backend. If the QR code does not load, enter the base URL of your self-hosted API server first (same endpoint as in the Account tab).",
+    "endpointSave": "Save & Refresh"
   },
   "playlist": {
     "play": "Play",

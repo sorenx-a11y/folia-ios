@@ -29,6 +29,32 @@ body {
   overflow: hidden;
 }
 
+/* iOS/WKWebView：禁用长按文字/图片弹出的系统菜单（拷贝、查询、共享、“提取文本”等），
+   也禁用非输入区域的文本选择与点击灰闪。输入框、文本域、select、contenteditable
+   仍保留正常选择、粘贴与编辑能力。 */
+* {
+  -webkit-touch-callout: none;
+}
+
+html,
+body {
+  -webkit-user-select: none;
+  -moz-user-select: none;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+input,
+textarea,
+select,
+[contenteditable="true"],
+[contenteditable=""] {
+  -webkit-user-select: text;
+  -moz-user-select: text;
+  user-select: text;
+  -webkit-touch-callout: default;
+}
+
 /* 播放页空闲时隐藏鼠标指针。挂点在播放页的视觉层容器上，弹窗和浮动控件都在它外面，
    不会被波及，所以不需要 !important。
    后代选择器压得住 Tailwind 的 cursor-* 靠的不是特异性，而是这条规则**不在任何

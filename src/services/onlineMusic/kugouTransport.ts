@@ -1,6 +1,7 @@
 import md5 from 'blueimp-md5';
 import { OnlineProviderError } from '../../types/onlineMusic';
 import { readProviderSessionValue, removeProviderSessionValue, writeProviderSessionValue } from './providerStorage';
+import { readRuntimeApiBase } from './runtimeApiBase';
 
 // src/services/onlineMusic/kugouTransport.ts
 
@@ -57,6 +58,10 @@ const ENDPOINTS: Record<KugouOperation, string> = {
 };
 
 const getWebApiBase = (): string => {
+    // 运行时覆盖（网页/iOS 在账户页保存的自建服务地址）优先于构建期环境变量。
+    const runtimeOverride = readRuntimeApiBase('kugou');
+    if (runtimeOverride) return runtimeOverride;
+
     const viteValue = typeof import.meta !== 'undefined' && import.meta.env?.MODE !== 'test'
         ? String((import.meta as ImportMeta & { env?: Record<string, string> }).env?.VITE_KUGOU_API_BASE || '')
         : '';

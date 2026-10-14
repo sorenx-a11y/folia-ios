@@ -1,5 +1,6 @@
 import { NeteaseUser, NeteasePlaylist, NoCopyrightRecommendation, SongPrivilege, SongResult } from "../types";
 import { readProviderSessionValue, removeProviderSessionValue, writeProviderSessionValue } from './onlineMusic/providerStorage';
+import { readRuntimeApiBase } from './onlineMusic/runtimeApiBase';
 import type { PersonalFmRequestOptions } from '../types/onlineMusic';
 import {
   isNeteaseRouteMissingResponse,
@@ -29,6 +30,10 @@ const isElectronRuntime = () =>
   Boolean(getElectronBridge() && typeof getElectronBridge()?.getNeteasePort === 'function');
 
 const getConfiguredApiBase = () => {
+  // 运行时覆盖（网页/iOS 在账户页保存的自建服务地址）优先于构建期环境变量。
+  const runtimeOverride = readRuntimeApiBase('netease');
+  if (runtimeOverride) return runtimeOverride;
+
   const viteEnv = typeof import.meta !== 'undefined' ? (import.meta as any).env : undefined;
   if (viteEnv && typeof viteEnv.VITE_NETEASE_API_BASE === 'string' && viteEnv.VITE_NETEASE_API_BASE) {
     return viteEnv.VITE_NETEASE_API_BASE;

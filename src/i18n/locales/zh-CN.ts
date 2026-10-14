@@ -1157,7 +1157,16 @@ export default {
     "qualityExhigh": "极高",
     "qualityLossless": "无损",
     "qualityHires": "Hi-Res",
-    "vipOnly": "VIP 专属"
+    "vipOnly": "VIP 专属",
+    "musicServiceTitle": "音乐服务地址",
+    "musicServiceHint": "填写你自行部署的 API 服务地址（不含末尾斜杠），保存后应用会重新加载。留空则使用构建时内置地址。",
+    "neteaseBase": "网易云 API",
+    "qqBase": "QQ 音乐 API",
+    "kugouBase": "酷狗 API",
+    "saveAndReload": "保存并重新加载",
+    "endpointTitle": "API 服务地址",
+    "endpointHint": "iPhone/网页版不内置音乐服务后端，二维码加载不出来时，请先填写你自行部署的 API 服务地址（与账户页中同一平台的地址一致）。",
+    "endpointSave": "保存并刷新"
   },
   "playlist": {
     "play": "播放",
