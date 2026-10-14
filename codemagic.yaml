@@ -1,25 +1,18 @@
-# Codemagic 云构建配置：在 macOS 构建机上编译 Folia iOS（iPhone/iPad 通用）IPA。
-#
-# 首次使用前，在 Codemagic 网页端完成：
-# 1. Team settings -> codemagic.yaml settings -> Code signing identities
-#    - iOS certificates 标签：上传你的 .p12 证书，并在弹窗里输入证书密码（只需上传一次，
-#      不需要再建 CM_CERTIFICATE 之类的环境变量）。
-#    - iOS provisioning profiles 标签：上传 .mobileprovision 描述文件。
-#    页面会显示该描述文件是否与已上传证书匹配（绿色对勾）。
-# 2. 连接本仓库，Codemagic 检测到本文件后会出现「Folia iOS (iPhone/iPad IPA)」工作流。
-#
-# 下面 ios_signing.distribution_type 决定导出的包类型，按你的用途改：
-#   development  开发包，只能装在描述文件内登记 UDID 的设备，可用 Xcode/工具侧载
-#   ad_hoc       内测包，设备 UDID 需提前登记，可通过分发平台/工具安装（个人自用推荐）
-#   app_store    App Store / TestFlight 包，不能直接侧载
+# Codemagic 云构建配置：在 macOS 构建机上编译 Folia iOS（iPhone/iPad 通用）
+# 的【未签名 IPA】。云端不做任何签名，拿到 IPA 后由你自行决定签名方式：
+#   - Windows：Sideloadly / AltStore / 爱思助手 / ESign 等工具直接对该包重签名安装
+#   - Mac：codesign、fastlane sigh 或 Xcode 重签名后安装
+#   - 也可交给在线签名平台
+# 因此在 Codemagic 后台【不需要】配置任何证书、描述文件或环境变量，
+# 连接仓库后直接 Start build 即可。
 #
 # 前端若有改动，推送到仓库即可，本流程会重新执行 vite build，无需手工同步 dist。
 #
-# 不想自己管证书/描述文件：见文件底部的 app_store_connect 自动签名备选方案。
+# 如果以后想让云端直接出已签名包：参考文件底部的说明加回 ios_signing 段。
 
 workflows:
   folia-ipa:
-    name: Folia iOS (iPhone/iPad IPA)
+    name: Folia iOS 未签名 IPA (iPhone/iPad)
     instance_type: mac_mini_m2
     max_build_duration: 60
     environment:
@@ -28,9 +21,6 @@ workflows:
       vars:
         XCODE_PROJECT: ios/App/App.xcodeproj
         XCODE_SCHEME: App
-      ios_signing:
-        distribution_type: ad_hoc
-        bundle_identifier: top.izuna.foliamajor
     cache:
       cache_paths:
         - node_modules
@@ -50,24 +40,46 @@ workflows:
         script: npx vite build
       - name: 同步 Web 产物到 iOS 原生工程
         script: npx cap copy ios
-      - name: 应用已安装的证书与描述文件到 Xcode 工程
-        script: xcode-project use-profiles --project "$XCODE_PROJECT"
-      - name: 归档并签名导出 IPA（分发类型由上方 ios_signing 决定）
+      - name: 无签名归档（xcodebuild archive，跳过全部代码签名）
         script: |
-          xcode-project build-ipa \
-            --project "$XCODE_PROJECT" \
-            --scheme "$XCODE_SCHEME"
+          set -e
+          ARCHIVE_PATH="$HOME/build/App.xcarchive"
+          xcodebuild archive \
+            -project "$XCODE_PROJECT" \
+            -scheme "$XCODE_SCHEME" \
+            -configuration Release \
+            -destination 'generic/platform=iOS' \
+            -archivePath "$ARCHIVE_PATH" \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY="" \
+            CODE_SIGN_STYLE=Manual \
+            COMPILER_INDEX_STORE_ENABLE=NO
+      - name: 将 .app 手工打包为未签名 IPA（Payload 结构）
+        script: |
+          set -e
+          ARCHIVE_PATH="$HOME/build/App.xcarchive"
+          APP_PATH="$(find "$ARCHIVE_PATH/Products/Applications" -maxdepth 1 -name '*.app' | head -n 1)"
+          if [ -z "$APP_PATH" ]; then
+            echo "未在归档中找到 .app，构建失败" >&2
+            exit 1
+          fi
+          rm -rf Payload
+          mkdir -p Payload build/ios/ipa
+          cp -R "$APP_PATH" Payload/
+          APP_NAME="$(basename "$APP_PATH" .app)"
+          zip -qr "build/ios/ipa/${APP_NAME}-unsigned.ipa" Payload
+          echo "已生成: build/ios/ipa/${APP_NAME}-unsigned.ipa"
     artifacts:
       - build/ios/ipa/*.ipa
       - $HOME/Library/Developer/Xcode/DerivedData/**/Logs/**/*.log
 
 # ---------------------------------------------------------------------------
-# 备选：App Store Connect 自动签名（无需上传 .p12 / 描述文件）
-# 1. Codemagic Integrations 中添加 App Store Connect API key，记下它的引用名；
-# 2. 在本工作流下添加顶层 integrations，environment.ios_signing 保持不变：
-#
-#    integrations:
-#      app_store_connect: YOUR_API_KEY_REFERENCE_NAME
+# 以后若想让云端直接产出已签名 IPA：
+# 1. Codemagic 后台 Team settings -> Code signing identities 上传 .p12 证书和
+#    .mobileprovision 描述文件；
+# 2. 在 environment 下加回签名段，并把上面的「无签名归档 + 手工打包」两个脚本
+#    替换为官方归档命令：
 #
 #    environment:
 #      xcode: latest
@@ -76,8 +88,10 @@ workflows:
 #        XCODE_PROJECT: ios/App/App.xcodeproj
 #        XCODE_SCHEME: App
 #      ios_signing:
-#        distribution_type: ad_hoc   # development / ad_hoc / app_store
+#        distribution_type: ad_hoc        # development / ad_hoc / app_store
 #        bundle_identifier: top.izuna.foliamajor
 #
-# 构建时 Codemagic 会用 API key 自动获取（必要时创建）匹配的证书和描述文件。
+#    scripts 中 cap copy 之后改为：
+#      xcode-project use-profiles --project "$XCODE_PROJECT"
+#      xcode-project build-ipa --project "$XCODE_PROJECT" --scheme "$XCODE_SCHEME"
 # ---------------------------------------------------------------------------
