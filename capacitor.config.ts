@@ -14,6 +14,12 @@ const config: CapacitorConfig = {
     contentInset: 'never',
     backgroundColor: '#09090b',
   },
+  plugins: {
+    // 网易云直连：用原生 URLSession 发请求，绕过 WKWebView 的 CORS；Cookie 由业务层自行管理。
+    CapacitorHttp: {
+      enabled: true,
+    },
+  },
 };
 
 export default config;

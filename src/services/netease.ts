@@ -1,6 +1,7 @@
 import { NeteaseUser, NeteasePlaylist, NoCopyrightRecommendation, SongPrivilege, SongResult } from "../types";
 import { readProviderSessionValue, removeProviderSessionValue, writeProviderSessionValue } from './onlineMusic/providerStorage';
 import { readRuntimeApiBase } from './onlineMusic/runtimeApiBase';
+import { isNeteaseDirectEnabled, neteaseDirectFetch } from './onlineMusic/neteaseDirect';
 import type { PersonalFmRequestOptions } from '../types/onlineMusic';
 import {
   isNeteaseRouteMissingResponse,
@@ -115,6 +116,12 @@ const getApiBase = async () => {
 };
 
 const fetchWithCreds = async (endpoint: string, options: RequestInit = {}) => {
+  // iOS/原生壳：无自建 API 地址时走手机直连（eapi/weapi 本地加密 + CapacitorHttp），
+  // 用户在账户页保存了自建地址时仍优先用自建服务（高级回退）。Electron 内嵌后端不受影响。
+  if (!isElectronRuntime() && !getConfiguredApiBase() && isNeteaseDirectEnabled()) {
+    return neteaseDirectFetch(endpoint);
+  }
+
   const base = await getApiBase();
   const url = `${base}${endpoint}`;
   // Ensure we send credentials to persist session (cookies)
