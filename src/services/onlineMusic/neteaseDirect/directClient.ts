@@ -8,7 +8,7 @@ import {
   prepareRequestCookie,
   type PreparedCookie,
 } from './device';
-import { directHttpRequest } from './httpChannel';
+import { directHttpRequest } from '../../nativeHttpChannel';
 import {
   NETEASE_DIRECT_ROUTES,
   type Query,

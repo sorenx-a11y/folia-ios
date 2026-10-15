@@ -26,6 +26,8 @@ import GridViewSettingsSection from './GridViewSettingsSection';
 import VideoLayerSettingsSection from './VideoLayerSettingsSection';
 import NowPlayingCardSettingsSection from './NowPlayingCardSettingsSection';
 import { isThemeGenerationSource, type ThemeGenerationSource } from '../../../services/themePreferences';
+import NativeAiSettingsSection from './NativeAiSettingsSection';
+import type { NativeAiSettings } from '../../../services/ai/nativeAiSettings';
 import { SettingsAnchor } from './navigation/SettingsAnchorContext';
 import SettingsSectionHeading from './navigation/SettingsSectionHeading';
 import { settingsDividerClassFor } from './settingsCardClasses';
@@ -61,6 +63,9 @@ type AppearanceSettingsSubviewProps = {
     onChangeThemeGenerationSource: (source: ThemeGenerationSource) => void;
     aiApiKeyStatus: 'loading' | 'configured' | 'missing';
     onOpenAiSettings: () => void;
+    /** 原生壳（iOS/Android）的本地 AI 配置；桌面端与网页版由各自的通道提供，这里为 undefined。 */
+    nativeAiSettings?: NativeAiSettings;
+    onChangeNativeAiSettings?: (next: NativeAiSettings) => void;
     onToggleTransparentPlayerBackground: (enabled: boolean) => void;
     onToggleAutoHidePlayerChrome: (enabled: boolean) => void;
     onToggleAutoHideCursorWithPlayerChrome: (enabled: boolean) => void;
@@ -110,6 +115,8 @@ const AppearanceSettingsSubview: React.FC<AppearanceSettingsSubviewProps> = ({
     onChangeThemeGenerationSource,
     aiApiKeyStatus,
     onOpenAiSettings,
+    nativeAiSettings,
+    onChangeNativeAiSettings,
     onToggleTransparentPlayerBackground,
     onToggleAutoHidePlayerChrome,
     onToggleAutoHideCursorWithPlayerChrome,
@@ -906,6 +913,18 @@ const AppearanceSettingsSubview: React.FC<AppearanceSettingsSubviewProps> = ({
                     )}
                 </div>
             </SettingsAnchor>
+
+            {/* 原生壳：AI 服务商与密钥存在本机，桌面端/网页版没有这一段（各自另有通道）。 */}
+            {nativeAiSettings && onChangeNativeAiSettings && (
+                <NativeAiSettingsSection
+                    isDaylight={isDaylight}
+                    settingsCardClass={settingsCardClass}
+                    utilityGhostButtonClass={utilityGhostButtonClass}
+                    settings={nativeAiSettings}
+                    onChange={onChangeNativeAiSettings}
+                />
+            )}
+
             {/* Section 3: Now playing card */}
             <SettingsAnchor anchorId="stageTrackPill" label={t('options.stageTrackPill')}>
                 <SettingsSectionHeading icon={Music2} label={t('options.stageTrackPill')} />

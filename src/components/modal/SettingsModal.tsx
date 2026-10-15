@@ -51,6 +51,14 @@ import { useSettingsInitialAnchor } from '../../hooks/useSettingsInitialAnchor';
 import { useShallow } from 'zustand/react/shallow';
 import type { ObsBrowserSourceStatus } from '../../types/obsBrowserSource';
 import { getWebAiProvider } from '../../services/runtimeConfig';
+import {
+    DEFAULT_NATIVE_AI_SETTINGS,
+    hasNativeAiApiKey,
+    isNativeAiRuntime,
+    loadNativeAiSettings,
+    saveNativeAiSettings,
+    type NativeAiSettings,
+} from '../../services/ai/nativeAiSettings';
 import type { LyricApiStatus } from '../../types/lyricApi';
 import type { SongResult } from '../../types';
 import type { ThemeCacheSongKey } from '../../services/themeCache';
@@ -494,6 +502,14 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
         DISCORD_RICH_PRESENCE_ENABLED: false,
     });
     const [electronSettingsLoaded, setElectronSettingsLoaded] = useState(false);
+    // 原生壳（iOS/Android）的 AI 配置：没有主进程能保管密钥，改为存在本机并由 App 直连服务商。
+    const [nativeAiSettings, setNativeAiSettings] = useState<NativeAiSettings>(() => (
+        isNativeAiRuntime() ? loadNativeAiSettings() : DEFAULT_NATIVE_AI_SETTINGS
+    ));
+    const handleNativeAiSettingsChange = (next: NativeAiSettings) => {
+        setNativeAiSettings(next);
+        saveNativeAiSettings(next);
+    };
     // Keys stay in the main process; the renderer only knows which ones are saved, and the endpoint
     // the OpenAI-compatible key is bound to. The GEMINI_API_KEY / OPENAI_API_KEY fields in
     // electronSettings are drafts of a replacement key.
@@ -516,14 +532,27 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
     const savedAiApiKey = savedElectronAiCredentials.AI_PROVIDER === 'openai'
         ? savedElectronAiCredentials.OPENAI_API_KEY
         : savedElectronAiCredentials.GEMINI_API_KEY;
-    const aiApiKeyStatus: 'loading' | 'configured' | 'missing' = !isElectronRuntime
-        ? 'configured'
-        : !electronSettingsLoaded
-            ? 'loading'
-            : savedAiApiKey
-                ? 'configured'
-                : 'missing';
+    // 原生壳没有服务端代持密钥，「已配置」与否只能看本机配置；网页/自部署版仍由服务端环境变量提供。
+    const aiApiKeyStatus: 'loading' | 'configured' | 'missing' = isNativeAiRuntime()
+        ? (hasNativeAiApiKey(nativeAiSettings) ? 'configured' : 'missing')
+        : !isElectronRuntime
+            ? 'configured'
+            : !electronSettingsLoaded
+                ? 'loading'
+                : savedAiApiKey
+                    ? 'configured'
+                    : 'missing';
     const showQuarkDownload = electronSettings.UPDATE_CHANNEL === 'realeco';
+
+    // 「前往 AI 主题设置」：桌面端跳到「桌面端」分区；原生壳的 AI 配置就在本页下方（外观 → AI 主题设置），
+    // 直接滚过去而不是跳到不存在分区。
+    const handleOpenAiSettings = () => {
+        if (isElectronRuntime) {
+            useSettingsModalStore.getState().openSettings('options', 'desktop', null, 'electronSettings');
+            return;
+        }
+        document.getElementById('settings-nativeAiProvider')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    };
 
     useEffect(() => {
         if (aiApiKeyStatus === 'missing' && themeGenerationSource === 'ai') {
@@ -1746,7 +1775,9 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
                                                 themeGenerationSource={themeGenerationSource}
                                                 onChangeThemeGenerationSource={onChangeThemeGenerationSource}
                                                 aiApiKeyStatus={aiApiKeyStatus}
-                                                onOpenAiSettings={() => useSettingsModalStore.getState().openSettings('options', 'desktop', null, 'electronSettings')}
+                                                onOpenAiSettings={handleOpenAiSettings}
+                                                nativeAiSettings={isNativeAiRuntime() ? nativeAiSettings : undefined}
+                                                onChangeNativeAiSettings={handleNativeAiSettingsChange}
                                                 onToggleTransparentPlayerBackground={resolvedToggleTransparentPlayerBackground}
                                                 onToggleAutoHidePlayerChrome={onToggleAutoHidePlayerChrome}
                                                 onToggleAutoHideCursorWithPlayerChrome={onToggleAutoHideCursorWithPlayerChrome}

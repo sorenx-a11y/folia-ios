@@ -175,3 +175,85 @@ Expected JSON structure:
 export const buildThemeSourcePrompt = (snippet: string, isPureMusic: boolean, songTitle?: string) => `Pure instrumental: ${isPureMusic ? 'yes' : 'no'}
 ${isPureMusic && songTitle ? `Song title: ${songTitle}\n` : ''}Source snippet:
 ${snippet}`;
+
+// 与 electron/main.cjs 的 THEME_JSON_SCHEMA、api-ts/generate-theme_openai.ts 的同名常量保持一致：
+// 支持结构化输出的服务商（OpenAI 官方）直接收下这份 schema，其余服务商只能在提示词里带上它。
+export const THEME_JSON_SCHEMA = {
+    type: 'object',
+    additionalProperties: false,
+    properties: {
+        light: {
+            type: 'object',
+            additionalProperties: false,
+            description: 'Theme optimized for light/daylight mode',
+            properties: {
+                name: { type: 'string', description: 'A creative name for this light theme in Chinese, strictly limited to 10 characters or less' },
+                description: { type: 'string', description: 'A creative 1-sentence description of the mood or visual concept in Chinese, strictly limited to 15 to 30 Chinese characters' },
+                backgroundColor: { type: 'string', description: 'Hex code for light background' },
+                primaryColor: { type: 'string', description: 'Hex code for main text (dark)' },
+                accentColor: { type: 'string', description: 'Hex code for highlighted text/effects' },
+                secondaryColor: { type: 'string', description: 'Hex code for secondary elements' },
+                wordColors: {
+                    type: 'array',
+                    description: 'List of exact emotional standalone words from the source text and their specific colors; Latin-script words must not contain punctuation or spaces',
+                    items: {
+                        type: 'object',
+                        additionalProperties: false,
+                        properties: {
+                            word: { type: 'string' },
+                            color: { type: 'string' }
+                        },
+                        required: ['word', 'color']
+                    }
+                },
+                lyricsIcons: {
+                    type: 'array',
+                    description: 'List of Lucide icon names related to the source text',
+                    items: { type: 'string' }
+                }
+            },
+            required: ['name', 'description', 'backgroundColor', 'primaryColor', 'accentColor', 'secondaryColor', 'wordColors', 'lyricsIcons']
+        },
+        dark: {
+            type: 'object',
+            additionalProperties: false,
+            description: 'Theme optimized for dark/midnight mode',
+            properties: {
+                name: { type: 'string', description: 'A creative name for this dark theme in Chinese, strictly limited to 10 characters or less' },
+                description: { type: 'string', description: 'A creative 1-sentence description of the mood or visual concept in Chinese, strictly limited to 15 to 30 Chinese characters' },
+                backgroundColor: { type: 'string', description: 'Hex code for dark background' },
+                primaryColor: { type: 'string', description: 'Hex code for main text (light)' },
+                accentColor: { type: 'string', description: 'Hex code for highlighted text/effects' },
+                secondaryColor: { type: 'string', description: 'Hex code for secondary elements' },
+                wordColors: {
+                    type: 'array',
+                    description: 'List of exact emotional standalone words from the source text and their specific colors; Latin-script words must not contain punctuation or spaces',
+                    items: {
+                        type: 'object',
+                        additionalProperties: false,
+                        properties: {
+                            word: { type: 'string' },
+                            color: { type: 'string' }
+                        },
+                        required: ['word', 'color']
+                    }
+                },
+                lyricsIcons: {
+                    type: 'array',
+                    description: 'List of Lucide icon names related to the source text',
+                    items: { type: 'string' }
+                }
+            },
+            required: ['name', 'description', 'backgroundColor', 'primaryColor', 'accentColor', 'secondaryColor', 'wordColors', 'lyricsIcons']
+        }
+    },
+    required: ['light', 'dark']
+} as const;
+
+/** 主题生成的 system prompt：指令 + schema 文本（服务商不原生支持结构化输出时全靠它）。 */
+export const buildThemeSystemPrompt = (): string => `${THEME_GENERATION_PROMPT_PREFIX}
+
+Response MUST be a valid JSON object. Do not include markdown formatting like \`\`\`json. Just the raw JSON.
+
+JSON Schema:
+${JSON.stringify(THEME_JSON_SCHEMA, null, 2)}`;

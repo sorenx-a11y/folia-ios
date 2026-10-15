@@ -11,9 +11,14 @@ type AiConnectionTestProps = {
     payload: AiConnectionTestPayload;
     buttonClassName: string;
     isDaylight: boolean;
+    /**
+     * Where the test request goes. Defaults to the Electron main process; the native shell passes its
+     * own runner, which sends the request from the device (services/ai/nativeAiClient.ts).
+     */
+    runTest?: (payload: AiConnectionTestPayload) => Promise<AiConnectionTestResult>;
 };
 
-const AiConnectionTest: React.FC<AiConnectionTestProps> = ({ payload, buttonClassName, isDaylight }) => {
+const AiConnectionTest: React.FC<AiConnectionTestProps> = ({ payload, buttonClassName, isDaylight, runTest }) => {
     const { t } = useTranslation();
     const [running, setRunning] = React.useState(false);
     const [result, setResult] = React.useState<AiConnectionTestResult | null>(null);
@@ -33,8 +38,9 @@ const AiConnectionTest: React.FC<AiConnectionTestProps> = ({ payload, buttonClas
         setResult(null);
     }, [payload.apiKey, payload.apiUrl, payload.model, payload.stream, payload.useSystemProxy]);
 
-    const runTest = async () => {
-        if (running || !window.electron?.testAiConnection) {
+    const runner = runTest ?? window.electron?.testAiConnection?.bind(window.electron);
+    const handleRunTest = async () => {
+        if (running || !runner) {
             return;
         }
         const seq = requestSeqRef.current + 1;
@@ -43,7 +49,7 @@ const AiConnectionTest: React.FC<AiConnectionTestProps> = ({ payload, buttonClas
         setResult(null);
         let next: AiConnectionTestResult;
         try {
-            next = await window.electron.testAiConnection(payload);
+            next = await runner(payload);
         } catch (error) {
             next = {
                 ok: false,
@@ -82,7 +88,7 @@ const AiConnectionTest: React.FC<AiConnectionTestProps> = ({ payload, buttonClas
             <div className="flex flex-wrap items-center gap-3">
                 <button
                     type="button"
-                    onClick={runTest}
+                    onClick={handleRunTest}
                     disabled={running}
                     className={`shrink-0 px-4 py-1.5 border active:scale-95 disabled:scale-100 disabled:opacity-50 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 ${buttonClassName}`}
                     style={{ color: 'var(--text-primary)' }}

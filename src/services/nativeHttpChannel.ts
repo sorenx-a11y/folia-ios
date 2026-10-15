@@ -1,5 +1,5 @@
-// 原生 HTTP 通道：iOS 上用 CapacitorHttp 绕过 WKWebView 的 CORS 与同源 cookie 限制；
-// 非 Capacitor 环境（浏览器调试）回退到 fetch，直连网易域名大概率会被 CORS 拦截，仅用于调试。
+// 原生 HTTP 通道：iOS 上用 CapacitorHttp 绕过 WKWebView 的 CORS 与同源限制（网易直连、AI 直连共用）；
+// 非 Capacitor 环境（浏览器调试）回退到 fetch，直连第三方域名大概率会被 CORS 拦截，仅用于调试。
 import { Capacitor, CapacitorHttp } from '@capacitor/core';
 
 export interface DirectHttpResponse {
@@ -13,7 +13,13 @@ export interface DirectHttpRequest {
   url: string;
   headers: Record<string, string>;
   body: string;
+  // 覆盖原生读取超时：AI 生成一条完整回复可能要几十秒，默认的 20s 不够。
+  connectTimeoutMs?: number;
+  readTimeoutMs?: number;
 }
+
+export const DEFAULT_NATIVE_CONNECT_TIMEOUT_MS = 20000;
+export const DEFAULT_NATIVE_READ_TIMEOUT_MS = 20000;
 
 const viaNative = (): boolean => Capacitor.isNativePlatform();
 
@@ -25,8 +31,8 @@ const nativeRequest = async (request: DirectHttpRequest): Promise<DirectHttpResp
     data: request.body,
     // 自己解析 JSON：错误响应同样是 JSON，交给上层按 code 处理。
     responseType: 'text',
-    connectTimeout: 20000,
-    readTimeout: 20000,
+    connectTimeout: request.connectTimeoutMs ?? DEFAULT_NATIVE_CONNECT_TIMEOUT_MS,
+    readTimeout: request.readTimeoutMs ?? DEFAULT_NATIVE_READ_TIMEOUT_MS,
   });
   const bodyText =
     typeof response.data === 'string'

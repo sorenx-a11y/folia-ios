@@ -2,6 +2,8 @@ import { DualTheme } from "../types";
 import { applyStoredAnimationIntensityToDualTheme } from "./themePreferences";
 import { sanitizeDualTheme } from "./themeSanitizer";
 import { getWebAiProvider } from "./runtimeConfig";
+import { generateNativeAiTheme } from "./ai/nativeAiClient";
+import { isNativeAiRuntime } from "./ai/nativeAiSettings";
 
 const getErrorMessage = (error: unknown) => {
   if (error instanceof Error) {
@@ -25,6 +27,17 @@ export const generateThemeFromLyrics = async (
     if ((window as any).electron && typeof (window as any).electron.generateTheme === 'function') {
       const dualTheme = await (window as any).electron.generateTheme(lyricsText, options);
       return sanitizeDualTheme(dualTheme);
+    }
+
+    // 原生壳（iOS/Android）：没有 Electron 主进程，也没有可请求的 /api 后端，
+    // 用设置页「AI 主题设置」里保存的本地配置直接调用服务商（见 services/ai/nativeAiClient.ts）。
+    if (isNativeAiRuntime()) {
+      const dualTheme = await generateNativeAiTheme({
+        lyricsText,
+        isPureMusic: options?.isPureMusic,
+        songTitle: options?.songTitle,
+      });
+      return applyStoredAnimationIntensityToDualTheme(dualTheme);
     }
 
     const provider = getWebAiProvider();

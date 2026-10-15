@@ -1,5 +1,7 @@
 // Plain ESM module shared with the Vercel and Worker runtimes; resolved through allowJs.
 import { buildSegmentationManualPrompt } from '../../shared/lyricSegmentationPrompt.mjs';
+import { segmentLyricsNative } from './ai/nativeLyricSegmentation';
+import { isNativeAiRuntime } from './ai/nativeAiSettings';
 
 // src/services/lyricSegmentationAi.ts
 // Renderer-side entry to lyric word segmentation, mirroring the Electron/web split in gemini.ts:
@@ -62,6 +64,12 @@ const segmentBatch = async (lines: string[], signal?: AbortSignal): Promise<(str
     const bridge = getElectronBridge();
     if (bridge?.segmentLyrics) {
         return assertBoundaries(await bridge.segmentLyrics(lines), lines);
+    }
+
+    // 原生壳（iOS/Android）：没有 Electron preload，也没有自部署的 /api 后端，用设置页「AI 主题设置」
+    // 里保存的本地配置直接调用服务商（见 services/ai/nativeLyricSegmentation.ts）。
+    if (isNativeAiRuntime()) {
+        return assertBoundaries(await segmentLyricsNative(lines), lines);
     }
 
     const response = await fetch('/api/segment-lyrics', {
